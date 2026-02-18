@@ -1287,15 +1287,19 @@
             if (ffmpegLoaded) return true;
             
             try {
-                const { FFmpeg } = FFmpegWASM;
-                const { fetchFile } = FFmpegUtil;
+                // Access FFmpeg from global
+                const FFmpeg = FFmpegWASM.FFmpeg;
                 
                 ffmpeg = new FFmpeg();
                 ffmpeg.on('progress', ({ progress }) => {
                     const pct = Math.round(progress * 100);
-                    document.getElementById('export-progress').textContent = `导出中... ${pct}%`;
+                    const progressEl = document.getElementById('export-progress');
+                    const barEl = document.getElementById('export-bar');
+                    if (progressEl) progressEl.textContent = `编码中... ${pct}%`;
+                    if (barEl) barEl.style.width = (30 + pct * 0.5) + '%';
                 });
                 
+                console.log('Loading FFmpeg core...');
                 await ffmpeg.load({
                     coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.4/dist/umd/ffmpeg-core.js',
                 });
@@ -1339,42 +1343,41 @@
             
             try {
                 // Load FFmpeg
+                document.getElementById('export-bar').style.width = '5%';
                 const loaded = await loadFFmpeg();
                 if (!loaded) {
                     document.getElementById('export-progress').textContent = '❌ FFmpeg加载失败，请刷新重试';
                     return;
                 }
                 
-                const { fetchFile } = FFmpegUtil;
-                document.getElementById('export-progress').textContent = '正在处理视频...';
-                document.getElementById('export-bar').style.width = '10%';
+                document.getElementById('export-progress').textContent = '正在读取视频...';
+                document.getElementById('export-bar').style.width = '15%';
                 
                 // Process first video clip (simple export for now)
                 const clip = videoClips[0];
                 const response = await fetch(clip.url);
                 const videoData = await response.arrayBuffer();
                 
+                document.getElementById('export-progress').textContent = '正在写入文件...';
+                document.getElementById('export-bar').style.width = '25%';
+                
                 await ffmpeg.writeFile('input.mp4', new Uint8Array(videoData));
-                document.getElementById('export-bar').style.width = '30%';
                 
                 // Get clip trim info
-                const startTime = clip.trimStart || 0;
-                const duration = clip.duration;
+                const clipDuration = clip.duration;
                 
                 document.getElementById('export-progress').textContent = '正在编码...';
+                document.getElementById('export-bar').style.width = '30%';
                 
-                // Run FFmpeg to re-encode
+                // Run FFmpeg to re-encode (copy streams for speed)
                 await ffmpeg.exec([
                     '-i', 'input.mp4',
-                    '-t', String(duration),
-                    '-c:v', 'libx264',
-                    '-preset', 'fast',
-                    '-crf', '23',
-                    '-c:a', 'aac',
+                    '-t', String(clipDuration),
+                    '-c', 'copy',
                     'output.mp4'
                 ]);
                 
-                document.getElementById('export-bar').style.width = '80%';
+                document.getElementById('export-bar').style.width = '85%';
                 document.getElementById('export-progress').textContent = '正在生成文件...';
                 
                 // Read output
@@ -1388,6 +1391,7 @@
                 a.href = url;
                 a.download = document.getElementById('project-name').value + '.mp4';
                 a.click();
+                URL.revokeObjectURL(url);
                 
                 document.getElementById('export-progress').textContent = '✅ 导出完成！';
                 
@@ -1395,7 +1399,8 @@
                 
             } catch (e) {
                 console.error('Export error:', e);
-                document.getElementById('export-progress').textContent = '❌ 导出失败: ' + e.message;
+                const progressEl = document.getElementById('export-progress');
+                if (progressEl) progressEl.textContent = '❌ 导出失败: ' + e.message;
             }
         }
 
