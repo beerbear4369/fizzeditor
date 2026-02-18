@@ -1289,6 +1289,7 @@
             try {
                 // Access FFmpeg from global
                 const FFmpeg = FFmpegWASM.FFmpeg;
+                const { toBlobURL } = FFmpegUtil;
                 
                 ffmpeg = new FFmpeg();
                 ffmpeg.on('progress', ({ progress }) => {
@@ -1299,9 +1300,13 @@
                     if (barEl) barEl.style.width = (30 + pct * 0.5) + '%';
                 });
                 
-                console.log('Loading FFmpeg core...');
+                console.log('Loading FFmpeg core (this may take a while)...');
+                
+                // Use toBlobURL to avoid CORS issues
+                const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.4/dist/umd';
                 await ffmpeg.load({
-                    coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.4/dist/umd/ffmpeg-core.js',
+                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
                 });
                 
                 ffmpegLoaded = true;
