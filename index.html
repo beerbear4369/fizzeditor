@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FizzEditor - AI番劇剪辑器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: #16213e;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #0f3460;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #e94560;
+        }
+
+        .logo span {
+            color: #fff;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #e94560;
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #ff6b6b;
+        }
+
+        .btn-secondary {
+            background: #0f3460;
+            color: #fff;
+        }
+
+        .btn-secondary:hover {
+            background: #1a4a7a;
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: grid;
+            grid-template-columns: 280px 1fr 280px;
+            height: calc(100vh - 60px - 200px);
+        }
+
+        /* Media Library */
+        .media-library {
+            background: #16213e;
+            border-right: 1px solid #0f3460;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            padding: 15px;
+            border-bottom: 1px solid #0f3460;
+            font-weight: 600;
+        }
+
+        .drop-zone {
+            flex: 1;
+            margin: 15px;
+            border: 2px dashed #0f3460;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #e94560;
+            background: rgba(233, 69, 96, 0.1);
+        }
+
+        .drop-zone-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .drop-zone-text {
+            color: #888;
+            text-align: center;
+        }
+
+        .media-list {
+            padding: 10px;
+            overflow-y: auto;
+            max-height: 300px;
+        }
+
+        .media-item {
+            background: #0f3460;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+        }
+
+        .media-item:hover {
+            background: #1a4a7a;
+        }
+
+        .media-item.dragging {
+            opacity: 0.5;
+        }
+
+        .media-thumb {
+            width: 60px;
+            height: 40px;
+            background: #1a1a2e;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .media-thumb video, .media-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .media-info {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .media-name {
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .media-duration {
+            font-size: 11px;
+            color: #888;
+        }
+
+        /* Preview Area */
+        .preview-area {
+            display: flex;
+            flex-direction: column;
+            background: #1a1a2e;
+        }
+
+        .preview-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            margin: 15px;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #preview-video {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .preview-placeholder {
+            color: #555;
+            text-align: center;
+        }
+
+        .preview-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            padding: 15px;
+            background: #16213e;
+            margin: 0 15px 15px;
+            border-radius: 10px;
+        }
+
+        .control-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 50%;
+            background: #0f3460;
+            color: #fff;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            background: #e94560;
+        }
+
+        .control-btn.play-btn {
+            width: 50px;
+            height: 50px;
+            background: #e94560;
+        }
+
+        .time-display {
+            font-family: monospace;
+            font-size: 14px;
+            color: #888;
+        }
+
+        /* Properties Panel */
+        .properties-panel {
+            background: #16213e;
+            border-left: 1px solid #0f3460;
+        }
+
+        .property-group {
+            padding: 15px;
+            border-bottom: 1px solid #0f3460;
+        }
+
+        .property-label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        .property-input {
+            width: 100%;
+            padding: 8px;
+            background: #0f3460;
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .property-slider {
+            width: 100%;
+            margin-top: 5px;
+        }
+
+        /* Timeline */
+        .timeline-container {
+            height: 200px;
+            background: #16213e;
+            border-top: 1px solid #0f3460;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .timeline-toolbar {
+            display: flex;
+            align-items: center;
+            padding: 10px 15px;
+            gap: 10px;
+            border-bottom: 1px solid #0f3460;
+        }
+
+        .timeline-tool {
+            padding: 6px 12px;
+            background: #0f3460;
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .timeline-tool:hover {
+            background: #1a4a7a;
+        }
+
+        .timeline-tool.active {
+            background: #e94560;
+        }
+
+        .zoom-control {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-left: auto;
+        }
+
+        .zoom-slider {
+            width: 100px;
+        }
+
+        .timeline-scroll {
+            flex: 1;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        .timeline {
+            min-width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .time-ruler {
+            height: 25px;
+            background: #0f3460;
+            position: relative;
+            border-bottom: 1px solid #1a1a2e;
+        }
+
+        .time-marker {
+            position: absolute;
+            font-size: 10px;
+            color: #888;
+            transform: translateX(-50%);
+            top: 5px;
+        }
+
+        .tracks-container {
+            padding: 10px 0;
+        }
+
+        .track {
+            height: 50px;
+            background: #1a1a2e;
+            margin: 5px 10px;
+            border-radius: 6px;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .track-label {
+            position: absolute;
+            left: -70px;
+            width: 60px;
+            font-size: 11px;
+            color: #888;
+            text-align: right;
+        }
+
+        .track-content {
+            flex: 1;
+            height: 100%;
+            position: relative;
+            margin-left: 80px;
+        }
+
+        .clip {
+            position: absolute;
+            height: 40px;
+            top: 5px;
+            background: linear-gradient(135deg, #e94560, #ff6b6b);
+            border-radius: 4px;
+            cursor: move;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            font-size: 11px;
+            overflow: hidden;
+            white-space: nowrap;
+            min-width: 50px;
+        }
+
+        .clip.audio {
+            background: linear-gradient(135deg, #4ecca3, #45b7aa);
+        }
+
+        .clip:hover {
+            box-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+        }
+
+        .clip.selected {
+            box-shadow: 0 0 0 2px #fff;
+        }
+
+        .clip-handle {
+            position: absolute;
+            width: 8px;
+            height: 100%;
+            cursor: ew-resize;
+            background: rgba(255,255,255,0.3);
+        }
+
+        .clip-handle.left {
+            left: 0;
+            border-radius: 4px 0 0 4px;
+        }
+
+        .clip-handle.right {
+            right: 0;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .playhead {
+            position: absolute;
+            width: 2px;
+            background: #e94560;
+            top: 0;
+            bottom: 0;
+            left: 80px;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .playhead::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -6px;
+            width: 14px;
+            height: 14px;
+            background: #e94560;
+            clip-path: polygon(50% 100%, 0 0, 100% 0);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .main-container {
+                grid-template-columns: 220px 1fr 220px;
+            }
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .recording .playhead {
+            animation: pulse 1s infinite;
+        }
+
+        /* Hidden file input */
+        #file-input {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <input type="file" id="file-input" multiple accept="video/*,audio/*,image/*">
+    
+    <!-- Header -->
+    <header class="header">
+        <div class="logo">Fizz<span>Editor</span></div>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="newProject()">📁 新建项目</button>
+            <button class="btn btn-secondary" onclick="saveProject()">💾 保存</button>
+            <button class="btn btn-primary" onclick="exportVideo()">📤 导出视频</button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Media Library -->
+        <aside class="media-library">
+            <div class="panel-header">📂 媒体库</div>
+            <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+                <div class="drop-zone-icon">📁</div>
+                <div class="drop-zone-text">
+                    拖拽视频/音频到这里<br>
+                    <small>或点击选择文件</small>
+                </div>
+            </div>
+            <div class="media-list" id="media-list"></div>
+        </aside>
+
+        <!-- Preview Area -->
+        <main class="preview-area">
+            <div class="preview-container">
+                <video id="preview-video" style="display:none;"></video>
+                <div class="preview-placeholder" id="preview-placeholder">
+                    <div style="font-size: 64px; margin-bottom: 10px;">🎬</div>
+                    <div>添加媒体文件开始剪辑</div>
+                </div>
+            </div>
+            <div class="preview-controls">
+                <button class="control-btn" onclick="skipBackward()">⏮</button>
+                <button class="control-btn" onclick="frameBack()">◀◀</button>
+                <button class="control-btn play-btn" id="play-btn" onclick="togglePlay()">▶</button>
+                <button class="control-btn" onclick="frameForward()">▶▶</button>
+                <button class="control-btn" onclick="skipForward()">⏭</button>
+                <span class="time-display" id="time-display">00:00:00 / 00:00:00</span>
+            </div>
+        </main>
+
+        <!-- Properties Panel -->
+        <aside class="properties-panel">
+            <div class="panel-header">⚙️ 属性</div>
+            <div class="property-group">
+                <div class="property-label">项目名称</div>
+                <input type="text" class="property-input" value="未命名项目" id="project-name">
+            </div>
+            <div class="property-group">
+                <div class="property-label">分辨率</div>
+                <select class="property-input" id="resolution">
+                    <option value="1920x1080">1920 × 1080 (1080p)</option>
+                    <option value="1280x720">1280 × 720 (720p)</option>
+                    <option value="3840x2160">3840 × 2160 (4K)</option>
+                    <option value="1080x1920">1080 × 1920 (竖屏)</option>
+                </select>
+            </div>
+            <div class="property-group">
+                <div class="property-label">帧率</div>
+                <select class="property-input" id="framerate">
+                    <option value="24">24 fps (电影)</option>
+                    <option value="25">25 fps (PAL)</option>
+                    <option value="30" selected>30 fps</option>
+                    <option value="60">60 fps</option>
+                </select>
+            </div>
+            <div class="property-group" id="clip-properties" style="display:none;">
+                <div class="property-label">选中片段</div>
+                <div class="property-label">音量</div>
+                <input type="range" class="property-slider" min="0" max="100" value="100" id="clip-volume">
+                <div class="property-label">速度</div>
+                <input type="range" class="property-slider" min="25" max="400" value="100" id="clip-speed">
+            </div>
+        </aside>
+    </div>
+
+    <!-- Timeline -->
+    <div class="timeline-container">
+        <div class="timeline-toolbar">
+            <button class="timeline-tool" onclick="splitClip()">✂️ 分割</button>
+            <button class="timeline-tool" onclick="deleteClip()">🗑️ 删除</button>
+            <button class="timeline-tool" onclick="duplicateClip()">📋 复制</button>
+            <button class="timeline-tool" onclick="addText()">📝 文字</button>
+            <button class="timeline-tool" onclick="addTransition()">🔀 转场</button>
+            <div class="zoom-control">
+                <span>🔍</span>
+                <input type="range" class="zoom-slider" min="10" max="200" value="50" id="zoom-slider" oninput="updateZoom()">
+            </div>
+        </div>
+        <div class="timeline-scroll" id="timeline-scroll">
+            <div class="timeline" id="timeline">
+                <div class="time-ruler" id="time-ruler"></div>
+                <div class="playhead" id="playhead"></div>
+                <div class="tracks-container" id="tracks-container">
+                    <div class="track" data-type="video">
+                        <span class="track-label">🎬 视频</span>
+                        <div class="track-content" id="video-track"></div>
+                    </div>
+                    <div class="track" data-type="audio">
+                        <span class="track-label">🔊 音频</span>
+                        <div class="track-content" id="audio-track"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let mediaFiles = [];
+        let clips = [];
+        let selectedClip = null;
+        let isPlaying = false;
+        let currentTime = 0;
+        let duration = 0;
+        let pixelsPerSecond = 50;
+        let clipIdCounter = 0;
+
+        // DOM Elements
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const mediaList = document.getElementById('media-list');
+        const previewVideo = document.getElementById('preview-video');
+        const previewPlaceholder = document.getElementById('preview-placeholder');
+        const playBtn = document.getElementById('play-btn');
+        const timeDisplay = document.getElementById('time-display');
+        const videoTrack = document.getElementById('video-track');
+        const audioTrack = document.getElementById('audio-track');
+        const playhead = document.getElementById('playhead');
+        const timeRuler = document.getElementById('time-ruler');
+        const zoomSlider = document.getElementById('zoom-slider');
+
+        // File handling
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        function handleFiles(files) {
+            for (const file of files) {
+                const type = file.type.startsWith('video') ? 'video' : 
+                             file.type.startsWith('audio') ? 'audio' : 'image';
+                
+                const url = URL.createObjectURL(file);
+                const media = {
+                    id: Date.now() + Math.random(),
+                    name: file.name,
+                    type: type,
+                    url: url,
+                    duration: 0
+                };
+
+                if (type === 'video' || type === 'audio') {
+                    const el = document.createElement(type);
+                    el.src = url;
+                    el.onloadedmetadata = () => {
+                        media.duration = el.duration;
+                        addMediaToLibrary(media);
+                    };
+                } else {
+                    media.duration = 5; // Default 5s for images
+                    addMediaToLibrary(media);
+                }
+            }
+        }
+
+        function addMediaToLibrary(media) {
+            mediaFiles.push(media);
+            renderMediaLibrary();
+        }
+
+        function renderMediaLibrary() {
+            mediaList.innerHTML = mediaFiles.map(media => `
+                <div class="media-item" draggable="true" 
+                     ondragstart="dragMediaStart(event, '${media.id}')"
+                     ondragend="dragMediaEnd(event)">
+                    <div class="media-thumb">
+                        ${media.type === 'video' ? 
+                            `<video src="${media.url}" muted></video>` :
+                            media.type === 'audio' ? '🎵' : 
+                            `<img src="${media.url}">`}
+                    </div>
+                    <div class="media-info">
+                        <div class="media-name">${media.name}</div>
+                        <div class="media-duration">${formatTime(media.duration)}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Drag and drop to timeline
+        let draggedMedia = null;
+
+        function dragMediaStart(e, mediaId) {
+            draggedMedia = mediaFiles.find(m => m.id == mediaId);
+            e.target.classList.add('dragging');
+        }
+
+        function dragMediaEnd(e) {
+            e.target.classList.remove('dragging');
+        }
+
+        videoTrack.addEventListener('dragover', (e) => e.preventDefault());
+        audioTrack.addEventListener('dragover', (e) => e.preventDefault());
+
+        videoTrack.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (draggedMedia && (draggedMedia.type === 'video' || draggedMedia.type === 'image')) {
+                addClipToTrack(draggedMedia, 'video', e.offsetX);
+            }
+        });
+
+        audioTrack.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (draggedMedia && (draggedMedia.type === 'audio' || draggedMedia.type === 'video')) {
+                addClipToTrack(draggedMedia, 'audio', e.offsetX);
+            }
+        });
+
+        function addClipToTrack(media, trackType, offsetX) {
+            const startTime = Math.max(0, offsetX / pixelsPerSecond);
+            const clip = {
+                id: ++clipIdCounter,
+                mediaId: media.id,
+                name: media.name,
+                type: trackType,
+                url: media.url,
+                startTime: startTime,
+                duration: media.duration,
+                trimStart: 0,
+                trimEnd: media.duration,
+                volume: 100,
+                speed: 100
+            };
+            clips.push(clip);
+            renderTimeline();
+            updateDuration();
+        }
+
+        function renderTimeline() {
+            // Render time ruler
+            const totalSeconds = Math.max(60, duration + 10);
+            const rulerWidth = totalSeconds * pixelsPerSecond;
+            timeRuler.style.width = rulerWidth + 'px';
+            
+            let rulerHTML = '';
+            for (let i = 0; i <= totalSeconds; i += 5) {
+                rulerHTML += `<span class="time-marker" style="left:${i * pixelsPerSecond + 80}px">${formatTime(i)}</span>`;
+            }
+            timeRuler.innerHTML = rulerHTML;
+
+            // Render video clips
+            const videoClips = clips.filter(c => c.type === 'video');
+            videoTrack.innerHTML = videoClips.map(clip => `
+                <div class="clip ${selectedClip?.id === clip.id ? 'selected' : ''}" 
+                     data-id="${clip.id}"
+                     style="left:${clip.startTime * pixelsPerSecond}px; width:${clip.duration * pixelsPerSecond}px"
+                     onclick="selectClip(${clip.id})"
+                     draggable="true"
+                     ondragstart="dragClipStart(event, ${clip.id})"
+                     ondrag="dragClip(event, ${clip.id})"
+                     ondragend="dragClipEnd(event)">
+                    <div class="clip-handle left"></div>
+                    ${clip.name}
+                    <div class="clip-handle right"></div>
+                </div>
+            `).join('');
+
+            // Render audio clips
+            const audioClips = clips.filter(c => c.type === 'audio');
+            audioTrack.innerHTML = audioClips.map(clip => `
+                <div class="clip audio ${selectedClip?.id === clip.id ? 'selected' : ''}" 
+                     data-id="${clip.id}"
+                     style="left:${clip.startTime * pixelsPerSecond}px; width:${clip.duration * pixelsPerSecond}px"
+                     onclick="selectClip(${clip.id})"
+                     draggable="true">
+                    <div class="clip-handle left"></div>
+                    ${clip.name}
+                    <div class="clip-handle right"></div>
+                </div>
+            `).join('');
+
+            // Update track widths
+            document.querySelectorAll('.track-content').forEach(track => {
+                track.style.width = rulerWidth + 'px';
+            });
+        }
+
+        function selectClip(clipId) {
+            selectedClip = clips.find(c => c.id === clipId);
+            renderTimeline();
+            
+            // Show clip properties
+            if (selectedClip) {
+                document.getElementById('clip-properties').style.display = 'block';
+                document.getElementById('clip-volume').value = selectedClip.volume;
+                document.getElementById('clip-speed').value = selectedClip.speed;
+            }
+        }
+
+        // Clip dragging
+        let dragClipStartX = 0;
+        let dragClipOriginalStart = 0;
+
+        function dragClipStart(e, clipId) {
+            dragClipStartX = e.clientX;
+            const clip = clips.find(c => c.id === clipId);
+            if (clip) {
+                dragClipOriginalStart = clip.startTime;
+            }
+        }
+
+        function dragClip(e, clipId) {
+            if (e.clientX === 0) return;
+            const clip = clips.find(c => c.id === clipId);
+            if (clip) {
+                const deltaX = e.clientX - dragClipStartX;
+                const newStart = Math.max(0, dragClipOriginalStart + deltaX / pixelsPerSecond);
+                clip.startTime = newStart;
+                renderTimeline();
+            }
+        }
+
+        function dragClipEnd(e) {
+            updateDuration();
+        }
+
+        // Timeline tools
+        function splitClip() {
+            if (!selectedClip) {
+                alert('请先选择一个片段');
+                return;
+            }
+            
+            const splitTime = currentTime - selectedClip.startTime;
+            if (splitTime <= 0 || splitTime >= selectedClip.duration) {
+                alert('播放头必须在片段内部');
+                return;
+            }
+
+            const newClip = {
+                ...selectedClip,
+                id: ++clipIdCounter,
+                startTime: currentTime,
+                duration: selectedClip.duration - splitTime
+            };
+            
+            selectedClip.duration = splitTime;
+            clips.push(newClip);
+            renderTimeline();
+        }
+
+        function deleteClip() {
+            if (!selectedClip) return;
+            clips = clips.filter(c => c.id !== selectedClip.id);
+            selectedClip = null;
+            document.getElementById('clip-properties').style.display = 'none';
+            renderTimeline();
+            updateDuration();
+        }
+
+        function duplicateClip() {
+            if (!selectedClip) return;
+            const newClip = {
+                ...selectedClip,
+                id: ++clipIdCounter,
+                startTime: selectedClip.startTime + selectedClip.duration
+            };
+            clips.push(newClip);
+            renderTimeline();
+            updateDuration();
+        }
+
+        function addText() {
+            alert('文字功能开发中...');
+        }
+
+        function addTransition() {
+            alert('转场功能开发中...');
+        }
+
+        // Playback
+        function togglePlay() {
+            isPlaying = !isPlaying;
+            playBtn.textContent = isPlaying ? '⏸' : '▶';
+            
+            if (isPlaying) {
+                playLoop();
+            }
+        }
+
+        function playLoop() {
+            if (!isPlaying) return;
+            
+            currentTime += 1/30;
+            if (currentTime >= duration) {
+                currentTime = 0;
+                isPlaying = false;
+                playBtn.textContent = '▶';
+            }
+            
+            updatePlayhead();
+            requestAnimationFrame(playLoop);
+        }
+
+        function updatePlayhead() {
+            playhead.style.left = (80 + currentTime * pixelsPerSecond) + 'px';
+            timeDisplay.textContent = `${formatTime(currentTime)} / ${formatTime(duration)}`;
+        }
+
+        function skipBackward() {
+            currentTime = Math.max(0, currentTime - 5);
+            updatePlayhead();
+        }
+
+        function skipForward() {
+            currentTime = Math.min(duration, currentTime + 5);
+            updatePlayhead();
+        }
+
+        function frameBack() {
+            currentTime = Math.max(0, currentTime - 1/30);
+            updatePlayhead();
+        }
+
+        function frameForward() {
+            currentTime = Math.min(duration, currentTime + 1/30);
+            updatePlayhead();
+        }
+
+        // Zoom
+        function updateZoom() {
+            pixelsPerSecond = parseInt(zoomSlider.value);
+            renderTimeline();
+            updatePlayhead();
+        }
+
+        // Utility
+        function formatTime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function updateDuration() {
+            duration = clips.reduce((max, clip) => Math.max(max, clip.startTime + clip.duration), 0);
+            timeDisplay.textContent = `${formatTime(currentTime)} / ${formatTime(duration)}`;
+        }
+
+        // Project functions
+        function newProject() {
+            if (confirm('确定要新建项目吗？当前项目将丢失。')) {
+                mediaFiles = [];
+                clips = [];
+                selectedClip = null;
+                currentTime = 0;
+                duration = 0;
+                renderMediaLibrary();
+                renderTimeline();
+                updatePlayhead();
+            }
+        }
+
+        function saveProject() {
+            const project = {
+                name: document.getElementById('project-name').value,
+                resolution: document.getElementById('resolution').value,
+                framerate: document.getElementById('framerate').value,
+                clips: clips
+            };
+            const blob = new Blob([JSON.stringify(project, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = project.name + '.fizzproj';
+            a.click();
+        }
+
+        function exportVideo() {
+            alert('视频导出功能开发中...\n\n目前支持导出项目文件，完整视频导出需要后端渲染支持。');
+        }
+
+        // Click on timeline ruler to seek
+        timeRuler.addEventListener('click', (e) => {
+            const rect = timeRuler.getBoundingClientRect();
+            const x = e.clientX - rect.left - 80;
+            currentTime = Math.max(0, Math.min(duration, x / pixelsPerSecond));
+            updatePlayhead();
+        });
+
+        // Initialize
+        renderTimeline();
+        updatePlayhead();
+
+        console.log('🎬 FizzEditor loaded!');
+    </script>
+</body>
+</html>
