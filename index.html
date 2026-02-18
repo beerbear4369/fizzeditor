@@ -1040,7 +1040,12 @@
             clips.push(clip);
             renderTimeline();
             updateDuration();
-            previewPlaceholder.style.display = 'none';
+            
+            // Load video preview
+            if (trackType === 'video') {
+                loadVideoPreview(media.url);
+                updatePreview();
+            }
         }
 
         function renderTimeline() {
@@ -1095,6 +1100,51 @@
                 document.getElementById('clip-properties').style.display = 'block';
                 document.getElementById('clip-volume').value = selectedClip.volume;
                 document.getElementById('clip-speed').value = selectedClip.speed;
+                
+                // Load video into preview
+                if (selectedClip.type === 'video') {
+                    loadVideoPreview(selectedClip.url);
+                }
+            }
+        }
+        
+        // Load video into preview monitor
+        function loadVideoPreview(url) {
+            previewVideo.src = url;
+            previewVideo.style.display = 'block';
+            previewPlaceholder.style.display = 'none';
+            previewVideo.load();
+        }
+        
+        // Get current clip at playhead position
+        function getClipAtTime(time) {
+            return clips.find(c => 
+                c.type === 'video' && 
+                time >= c.startTime && 
+                time < c.startTime + c.duration
+            );
+        }
+        
+        // Update preview to show current frame
+        function updatePreview() {
+            const clip = getClipAtTime(currentTime);
+            if (clip) {
+                if (previewVideo.src !== clip.url) {
+                    previewVideo.src = clip.url;
+                    previewVideo.style.display = 'block';
+                    previewPlaceholder.style.display = 'none';
+                }
+                // Seek to correct position within clip
+                const clipTime = currentTime - clip.startTime;
+                if (Math.abs(previewVideo.currentTime - clipTime) > 0.1) {
+                    previewVideo.currentTime = clipTime;
+                }
+            } else {
+                // No clip at current time - show black
+                if (clips.filter(c => c.type === 'video').length > 0) {
+                    previewVideo.style.display = 'block';
+                    previewPlaceholder.style.display = 'none';
+                }
             }
         }
 
@@ -1132,18 +1182,39 @@
         function togglePlay() {
             isPlaying = !isPlaying;
             playBtn.textContent = isPlaying ? '⏸' : '▶';
-            if (isPlaying) playLoop();
+            
+            if (isPlaying) {
+                // Start video playback
+                const clip = getClipAtTime(currentTime);
+                if (clip) {
+                    previewVideo.currentTime = currentTime - clip.startTime;
+                    previewVideo.play().catch(e => console.log('Autoplay blocked'));
+                }
+                playLoop();
+            } else {
+                previewVideo.pause();
+            }
         }
 
         function playLoop() {
             if (!isPlaying) return;
-            currentTime += 1/framerate;
+            
+            // Sync with video if playing
+            const clip = getClipAtTime(currentTime);
+            if (clip && previewVideo.src) {
+                currentTime = clip.startTime + previewVideo.currentTime;
+            } else {
+                currentTime += 1/framerate;
+            }
+            
             if (currentTime >= duration) {
                 currentTime = 0;
                 isPlaying = false;
                 playBtn.textContent = '▶';
+                previewVideo.pause();
             }
             updatePlayhead();
+            updatePreview();
             requestAnimationFrame(playLoop);
         }
 
@@ -1153,10 +1224,10 @@
             timecodeDisplay.textContent = formatTimecode(currentTime);
         }
 
-        function skipBackward() { currentTime = Math.max(0, currentTime - 5); updatePlayhead(); }
-        function skipForward() { currentTime = Math.min(duration, currentTime + 5); updatePlayhead(); }
-        function frameBack() { currentTime = Math.max(0, currentTime - 1/framerate); updatePlayhead(); }
-        function frameForward() { currentTime = Math.min(duration, currentTime + 1/framerate); updatePlayhead(); }
+        function skipBackward() { currentTime = Math.max(0, currentTime - 5); updatePlayhead(); updatePreview(); }
+        function skipForward() { currentTime = Math.min(duration, currentTime + 5); updatePlayhead(); updatePreview(); }
+        function frameBack() { currentTime = Math.max(0, currentTime - 1/framerate); updatePlayhead(); updatePreview(); }
+        function frameForward() { currentTime = Math.min(duration, currentTime + 1/framerate); updatePlayhead(); updatePreview(); }
 
         function updateZoom() {
             pixelsPerSecond = parseInt(zoomSlider.value);
@@ -1214,6 +1285,7 @@
             const x = e.clientX - rect.left - 100;
             currentTime = Math.max(0, Math.min(duration, x / pixelsPerSecond));
             updatePlayhead();
+            updatePreview();
         });
 
         // Init
