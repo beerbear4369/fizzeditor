@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FizzEditor Pro - AI番劇剪辑器</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FFmpeg WASM for video export -->
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.js"></script>
+    <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
     <style>
         :root {
             /* 黑色系 */
@@ -1276,8 +1279,124 @@
             a.click();
         }
 
-        function exportVideo() {
-            alert('🎬 视频导出功能开发中...\n\n目前支持导出项目文件。');
+        // FFmpeg WASM instance
+        let ffmpeg = null;
+        let ffmpegLoaded = false;
+        
+        async function loadFFmpeg() {
+            if (ffmpegLoaded) return true;
+            
+            try {
+                const { FFmpeg } = FFmpegWASM;
+                const { fetchFile } = FFmpegUtil;
+                
+                ffmpeg = new FFmpeg();
+                ffmpeg.on('progress', ({ progress }) => {
+                    const pct = Math.round(progress * 100);
+                    document.getElementById('export-progress').textContent = `导出中... ${pct}%`;
+                });
+                
+                await ffmpeg.load({
+                    coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.4/dist/umd/ffmpeg-core.js',
+                });
+                
+                ffmpegLoaded = true;
+                console.log('✅ FFmpeg WASM loaded');
+                return true;
+            } catch (e) {
+                console.error('FFmpeg load error:', e);
+                return false;
+            }
+        }
+        
+        async function exportVideo() {
+            const videoClips = clips.filter(c => c.type === 'video');
+            if (videoClips.length === 0) {
+                alert('请先添加视频片段到时间轴');
+                return;
+            }
+            
+            // Show export modal
+            const modal = document.createElement('div');
+            modal.id = 'export-modal';
+            modal.innerHTML = `
+                <div style="position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:1000;">
+                    <div style="background:#1E1E1E;padding:30px;border-radius:12px;width:400px;text-align:center;">
+                        <h3 style="color:#E63946;margin-bottom:20px;">🎬 导出视频</h3>
+                        <p id="export-progress" style="color:#E0E0E0;margin-bottom:20px;">正在加载FFmpeg...</p>
+                        <div style="background:#0A0A0A;height:8px;border-radius:4px;overflow:hidden;margin-bottom:20px;">
+                            <div id="export-bar" style="background:#E63946;height:100%;width:0%;transition:width 0.3s;"></div>
+                        </div>
+                        <button id="cancel-export" style="padding:10px 20px;background:#4A4A4A;border:none;border-radius:6px;color:#fff;cursor:pointer;">取消</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            document.getElementById('cancel-export').onclick = () => {
+                modal.remove();
+            };
+            
+            try {
+                // Load FFmpeg
+                const loaded = await loadFFmpeg();
+                if (!loaded) {
+                    document.getElementById('export-progress').textContent = '❌ FFmpeg加载失败，请刷新重试';
+                    return;
+                }
+                
+                const { fetchFile } = FFmpegUtil;
+                document.getElementById('export-progress').textContent = '正在处理视频...';
+                document.getElementById('export-bar').style.width = '10%';
+                
+                // Process first video clip (simple export for now)
+                const clip = videoClips[0];
+                const response = await fetch(clip.url);
+                const videoData = await response.arrayBuffer();
+                
+                await ffmpeg.writeFile('input.mp4', new Uint8Array(videoData));
+                document.getElementById('export-bar').style.width = '30%';
+                
+                // Get clip trim info
+                const startTime = clip.trimStart || 0;
+                const duration = clip.duration;
+                
+                document.getElementById('export-progress').textContent = '正在编码...';
+                
+                // Run FFmpeg to re-encode
+                await ffmpeg.exec([
+                    '-i', 'input.mp4',
+                    '-t', String(duration),
+                    '-c:v', 'libx264',
+                    '-preset', 'fast',
+                    '-crf', '23',
+                    '-c:a', 'aac',
+                    'output.mp4'
+                ]);
+                
+                document.getElementById('export-bar').style.width = '80%';
+                document.getElementById('export-progress').textContent = '正在生成文件...';
+                
+                // Read output
+                const data = await ffmpeg.readFile('output.mp4');
+                document.getElementById('export-bar').style.width = '100%';
+                
+                // Download
+                const blob = new Blob([data.buffer], { type: 'video/mp4' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = document.getElementById('project-name').value + '.mp4';
+                a.click();
+                
+                document.getElementById('export-progress').textContent = '✅ 导出完成！';
+                
+                setTimeout(() => modal.remove(), 2000);
+                
+            } catch (e) {
+                console.error('Export error:', e);
+                document.getElementById('export-progress').textContent = '❌ 导出失败: ' + e.message;
+            }
         }
 
         timeRuler.addEventListener('click', (e) => {
