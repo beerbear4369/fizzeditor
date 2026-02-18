@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FizzEditor Pro - AI番劇剪辑器</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- FFmpeg WASM for video export -->
-    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.js"></script>
-    <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+    <!-- FFmpeg WASM for video export (self-hosted to avoid CORS) -->
+    <script src="ffmpeg/ffmpeg.js"></script>
+    <script src="ffmpeg/ffmpeg-util.js"></script>
     <style>
         :root {
             /* 黑色系 */
@@ -1302,11 +1302,11 @@
                 
                 console.log('Loading FFmpeg core (this may take a while)...');
                 
-                // Use toBlobURL to avoid CORS issues
-                const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.4/dist/umd';
+                // Use local files to avoid CORS issues
+                const baseURL = window.location.origin + window.location.pathname.replace('index.html', '') + 'ffmpeg';
                 await ffmpeg.load({
-                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                    coreURL: `${baseURL}/ffmpeg-core.js`,
+                    wasmURL: `${baseURL}/ffmpeg-core.wasm`,
                 });
                 
                 ffmpegLoaded = true;
